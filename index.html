@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>作业智改 - 自动批改工具</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        .gradient-bg {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        }
+    </style>
+</head>
+<body class="bg-gray-50 min-h-screen font-sans">
+    <div class="max-w-3xl mx-auto px-4 py-12">
+        <!-- 标题区 -->
+        <header class="text-center mb-10">
+            <h1 class="text-4xl font-extrabold text-gray-900 mb-2">作业自动批改工具</h1>
+            <p class="text-gray-500">中小学教师与家长的 AI 模拟批改助手（MVP版）</p>
+        </header>
+
+        <!-- 主要表单区 -->
+        <div class="bg-white shadow-xl rounded-2xl p-8 mb-8">
+            <div class="space-y-6">
+                <!-- 答案上传区 -->
+                <div>
+                    <label class="block text-sm font-semibold text-gray-700 mb-2">1. 上传正确答案 (.txt)</label>
+                    <div class="flex items-center justify-center w-full">
+                        <label class="flex flex-col items-center justify-center w-full h-32 border-2 border-dashed border-gray-300 rounded-lg cursor-pointer bg-gray-50 hover:bg-gray-100 transition duration-150">
+                            <div class="flex flex-col items-center justify-center pt-5 pb-6">
+                                <svg class="w-8 h-8 mb-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path></svg>
+                                <p class="mb-2 text-sm text-gray-500"><span class="font-semibold" id="answer-filename">点击上传</span> 或拖拽文件到这里</p>
+                                <p class="text-xs text-gray-400">仅支持 .txt 文件</p>
+                            </div>
+                            <input id="answer-upload" type="file" accept=".txt" class="hidden" onchange="updateFilename('answer-upload', 'answer-filename')" />
+                        </label>
+                    </div>
+                </div>
+
+                <!-- 批改份数 -->
+                <div>
+                    <label class="block text-sm font-semibold text-gray-700 mb-2">2. 批改份数设置</label>
+                    <input type="number" id="homework-count" min="1" max="50" value="1" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500 text-gray-900" />
+                    <p class="mt-1 text-xs text-gray-400">设置范围：1 - 50</p>
+                </div>
+
+                <!-- 作业图片上传区 -->
+                <div>
+                    <label class="block text-sm font-semibold text-gray-700 mb-2">3. 上传作业图片</label>
+                    <div class="flex items-center justify-center w-full">
+                        <label class="flex flex-col items-center justify-center w-full h-32 border-2 border-dashed border-gray-300 rounded-lg cursor-pointer bg-gray-50 hover:bg-gray-100 transition duration-150">
+                            <div class="flex flex-col items-center justify-center pt-5 pb-6">
+                                <svg class="w-8 h-8 mb-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
+                                <p class="mb-2 text-sm text-gray-500"><span class="font-semibold" id="homework-filename">点击上传</span> 或拖拽图片到这里</p>
+                                <p class="text-xs text-gray-400">支持多张图片上传</p>
+                            </div>
+                            <input id="homework-upload" type="file" accept="image/*" multiple class="hidden" onchange="updateFilename('homework-upload', 'homework-filename')" />
+                        </label>
+                    </div>
+                </div>
+
+                <!-- 操作按钮 -->
+                <div class="pt-4">
+                    <button id="start-btn" onclick="startCorrection()" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-6 rounded-lg shadow-lg transform transition active:scale-95 flex items-center justify-center">
+                        <span id="btn-text">开始自动批改</span>
+                        <svg id="loading-spinner" class="hidden animate-spin ml-2 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        </svg>
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- 结果展示区 -->
+        <div id="results-container" class="hidden space-y-8">
+            <h2 class="text-2xl font-bold text-gray-800 text-center mb-6">批改结果展示</h2>
+            <div id="results-list"></div>
+            
+            <div class="flex justify-center pt-4">
+                <button class="bg-gray-200 hover:bg-gray-300 text-gray-700 font-semibold py-2 px-6 rounded-lg transition">
+                    导出批改报告（占位）
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function updateFilename(inputId, labelId) {
+            const input = document.getElementById(inputId);
+            const label = document.getElementById(labelId);
+            if (input.files.length > 0) {
+                if (input.files.length === 1) {
+                    label.textContent = input.files[0].name;
+                } else {
+                    label.textContent = `已选择 ${input.files.length} 个文件`;
+                }
+            } else {
+                label.textContent = "点击上传";
+            }
+        }
+
+        async function startCorrection() {
+            const answerFile = document.getElementById('answer-upload').files[0];
+            const homeworkFiles = document.getElementById('homework-upload').files;
+            const count = document.getElementById('homework-count').value;
+
+            if (!answerFile) {
+                alert('请先上传答案文件 (.txt)');
+                return;
+            }
+            if (homeworkFiles.length === 0) {
+                alert('请上传作业图片');
+                return;
+            }
+            if (homeworkFiles.length != count) {
+                alert(`上传图片数量 (${homeworkFiles.length}) 需与批改份数 (${count}) 一致`);
+                return;
+            }
+
+            // UI loading state
+            const btn = document.getElementById('start-btn');
+            const btnText = document.getElementById('btn-text');
+            const spinner = document.getElementById('loading-spinner');
+            const resultsContainer = document.getElementById('results-container');
+            const resultsList = document.getElementById('results-list');
+
+            btn.disabled = true;
+            btnText.textContent = "正在批改...";
+            spinner.classList.remove('hidden');
+            resultsContainer.classList.add('hidden');
+
+            const formData = new FormData();
+            formData.append('answer_file', answerFile);
+            for (let i = 0; i < homeworkFiles.length; i++) {
+                formData.append('homework_files', homeworkFiles[i]);
+            }
+            formData.append('count', count);
+
+            try {
+                // Add a small delay for simulation effect
+                await new Promise(resolve => setTimeout(resolve, 1000));
+                
+                const response = await fetch('/api/correct', {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    renderResults(data.results);
+                    resultsContainer.classList.remove('hidden');
+                    resultsContainer.scrollIntoView({ behavior: 'smooth' });
+                } else {
+                    alert('批改失败：' + data.message);
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                alert('网络错误，请稍后再试');
+            } finally {
+                btn.disabled = false;
+                btnText.textContent = "开始自动批改";
+                spinner.classList.add('hidden');
+            }
+        }
+
+        function renderResults(results) {
+            const resultsList = document.getElementById('results-list');
+            resultsList.innerHTML = '';
+
+            results.forEach((res, index) => {
+                const section = document.createElement('div');
+                section.className = "bg-white shadow rounded-xl overflow-hidden mb-8 border border-gray-100";
+                
+                let tableRows = res.data.map(item => `
+                    <tr class="hover:bg-gray-50 border-b border-gray-100">
+                        <td class="px-6 py-4 text-center font-medium text-gray-700">${item.id}</td>
+                        <td class="px-6 py-4 text-center text-gray-600">${item.student_ans}</td>
+                        <td class="px-6 py-4 text-center text-gray-600">${item.correct_ans}</td>
+                        <td class="px-6 py-4 text-center text-xl">${item.status}</td>
+                    </tr>
+                `).join('');
+
+                section.innerHTML = `
+                    <div class="bg-gray-800 text-white px-6 py-3 flex justify-between items-center">
+                        <h3 class="font-bold">第 ${index + 1} 份作业 - ${res.filename}</h3>
+                    </div>
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-sm text-left">
+                            <thead class="text-xs text-gray-700 uppercase bg-gray-100 border-b">
+                                <tr>
+                                    <th class="px-6 py-3 text-center">题号</th>
+                                    <th class="px-6 py-3 text-center">学生答案</th>
+                                    <th class="px-6 py-3 text-center">正确答案</th>
+                                    <th class="px-6 py-3 text-center">结果</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${tableRows}
+                            </tbody>
+                        </table>
+                    </div>
+                `;
+                resultsList.appendChild(section);
+            });
+        }
+    </script>
+</body>
+</html>

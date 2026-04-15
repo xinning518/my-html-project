@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>作业智改</title>
+
+<style>
+:root {
+    --bg: hsl(148, 57%, 95%);
+    --card: #ffffff;
+    --primary: #3cb371;
+    --text: #6da589;
+    --sub: #6b7d74;
+    --border: #e6eeea;
+}
+
+body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont;
+    background: var(--bg);
+    color: var(--text);
+}
+
+.container {
+    max-width: 900px;
+    margin: 40px auto;
+}
+
+.card {
+    background: var(--card);
+    border-radius: 16px;
+    padding: 20px;
+    margin-bottom: 20px;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.05);
+}
+
+h1 {
+    text-align: center;
+    margin-bottom: 20px;
+}
+
+.drop {
+    border: 2px dashed var(--border);
+    padding: 30px;
+    text-align: center;
+    border-radius: 12px;
+    cursor: pointer;
+    transition: 0.3s;
+}
+
+.drop:hover {
+    border-color: var(--primary);
+    background: #f2fffa;
+}
+
+button {
+    width: 100%;
+    padding: 14px;
+    border: none;
+    border-radius: 10px;
+    background: var(--primary);
+    color: white;
+    font-size: 16px;
+    cursor: pointer;
+}
+
+button:hover {
+    opacity: 0.9;
+}
+
+input[type="number"] {
+    width: 100%;
+    padding: 10px;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+}
+
+.result-item {
+    border-bottom: 1px solid var(--border);
+    padding: 10px 0;
+}
+
+.correct { color: green; }
+.wrong { color: red; }
+.empty { color: orange; }
+
+</style>
+</head>
+
+<body>
+
+<div class="container">
+
+<h1>📘 作业批改系统</h1>
+
+<div class="card">
+
+<div class="drop" onclick="answerInput.click()">
+    📄 上传标准答案
+    <input type="file" id="answerInput" hidden>
+</div>
+
+<br>
+
+<div class="drop" id="dropZone">
+    🖼️ 拖拽或点击上传作业
+    <input type="file" id="homeworkInput" multiple hidden>
+</div>
+
+<br>
+
+<label>批改份数（最大50）</label>
+<input type="number" id="count" value="1" min="1" max="50">
+
+<br><br>
+
+<button onclick="submitData()">开始批改</button>
+
+</div>
+
+<div class="card">
+    <button onclick="exportCSV()">导出结果</button>
+</div>
+
+<div id="result" class="card"></div>
+
+</div>
+
+<script>
+
+let lastResults = []
+
+// 拖拽上传
+const dropZone = document.getElementById("dropZone")
+
+dropZone.onclick = () => homeworkInput.click()
+
+dropZone.ondragover = (e) => {
+    e.preventDefault()
+    dropZone.style.borderColor = "#3cb371"
+}
+
+dropZone.ondragleave = () => {
+    dropZone.style.borderColor = "#e6eeea"
+}
+
+dropZone.ondrop = (e) => {
+    e.preventDefault()
+    homeworkInput.files = e.dataTransfer.files
+}
+
+// 提交
+function submitData() {
+    const answerFile = answerInput.files[0]
+    const homeworkFiles = homeworkInput.files
+    const count = Math.min(document.getElementById("count").value, 50)
+
+    let formData = new FormData()
+    formData.append("answer_file", answerFile)
+    formData.append("count", count)
+
+    for (let i = 0; i < homeworkFiles.length; i++) {
+        formData.append("homework_files", homeworkFiles[i])
+    }
+
+    document.getElementById("result").innerHTML = "⏳ 批改中..."
+
+    fetch("/api/correct", {
+        method: "POST",
+        body: formData
+    })
+    .then(res => res.json())
+    .then(data => {
+
+        lastResults = data.results
+
+        const resultDiv = document.getElementById("result")
+        resultDiv.innerHTML = ""
+
+        data.results.forEach(file => {
+
+            resultDiv.innerHTML += `<h3>${file.filename}（${file.score}/${file.total}）</h3>`
+
+            file.data.forEach(q => {
+
+                let cls = "correct"
+                if (q.status === "❌") cls = "wrong"
+                if (q.status === "⚠️") cls = "empty"
+
+                resultDiv.innerHTML += `
+                    <div class="result-item">
+                        第${q.id}题：${q.student_ans} 
+                        <span class="${cls}">${q.status}</span>
+                    </div>
+                `
+            })
+        })
+    })
+}
+
+// 导出 CSV
+function exportCSV() {
+    if (lastResults.length === 0) return alert("没有数据")
+
+    let csv = "文件,题号,学生答案,正确答案,状态\n"
+
+    lastResults.forEach(file => {
+        file.data.forEach(q => {
+            csv += `${file.filename},${q.id},${q.student_ans},${q.correct_ans},${q.status}\n`
+        })
+    })
+
+    let blob = new Blob([csv], { type: "text/csv" })
+    let url = URL.createObjectURL(blob)
+
+    let a = document.createElement("a")
+    a.href = url
+    a.download = "批改结果.csv"
+    a.click()
+}
+
+</script>
+
+</body>
+</html>
